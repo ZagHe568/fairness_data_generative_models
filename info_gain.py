@@ -32,7 +32,7 @@ colnames = list(df_raw.columns.values)
 print(colnames)
 for i in colnames:
 	if(i != 'two_year_recid'):
-		ig  = info_gain.info_gain(df_raw['two_year_recid'], df_raw[i]) 
+		ig  = info_gain.info_gain(df_raw['Y'], df_raw[i]) 
 		if(ig <0):
 			print(ig)
 			print(i)
