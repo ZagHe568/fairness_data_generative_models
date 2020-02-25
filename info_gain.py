@@ -1,49 +1,157 @@
-# Data preprocessing
-# 1. Add header to data
-# 2. Remove unknown: sed '/\?/d' adult.data > adult_known.data
-# 3. Remove tailing . in "adult.test": sed 's/.$//' adult_known.test > adult_known.test2
+from collections import Counter
+from scipy.stats import entropy
+import math
 
-import sklearn
-import sklearn.tree
-import sklearn.ensemble
-import sklearn.metrics
-import pandas as pd
-import numpy as np
-import scipy
-import scipy.optimize
-import pdb
-import tensorflow as tf
-import scipy.stats
+def _Ex_a_v_(Ex, a, v, nan=True):
+    """ Compute the Ex_a_v value given whether nan==nan or nan!=nan.
+    
+        Parameters
+        ----------
+        Ex : list of hashable
+            A list of hashable objects (examples)
+            corresponding to the given attributes a.
+            I.e. a[i] <--> Ex[i].
 
-tf.random.set_random_seed(2019)
+        a : list of hashable
+            A list of hashable objects (attributes)
+            corresponding to the given examples Ex.
+            I.e. a[i] <--> Ex[i].
+            
+        v : hashable object
+            The hashable object for which to compute
+            the Ex_a_v value.
+            
+        nan : boolean, default=True
+            Boolean indicating how nan==nan should be evaluated.
+            Default == True to avoid division by 0 errors.
+            
+        Returns
+        -------
+        result : list of hashable.
+            List of Ex where value(a) == v.
+            
+        """
+    if nan:
+        return [x for x, t in zip(Ex, a) if (isinstance(t, float) and
+                                             isinstance(v, float) and
+                                             math.isnan(t)        and
+                                             math.isnan(v))       or
+                                             (t == v)]
+    else:
+        return [x for x, t in zip(Ex, a) if t == v]
 
-# because we need to encode categorical feature, have to concate dataframe and then split
-#For Adult Dataset
 
-df_raw = pd.read_csv('male_adult_dataset', sep=', ', engine='python')
+def info_gain(Ex, a, nan=True):
+    """ Compute the information gain of an attribute a for given examples.
 
-  
+        Parameters
+        ----------
+        Ex : list of hashable
+            A list of hashable objects (examples)
+            corresponding to the given attributes a.
+            I.e. a[i] <--> Ex[i].
+
+        a : list of hashable
+            A list of hashable objects (attributes)
+            corresponding to the given examples Ex.
+            I.e. a[i] <--> Ex[i].
+            
+        nan : boolean, default=True
+            Boolean indicating how nan==nan should be evaluated.
+            Default == True to avoid division by 0 errors.
+
+        Returns
+        -------
+        result : float
+            Information gain by knowing given attributes.
+
+        """
+    # Check whether examples and attributes have the same lengths.
+    if len(Ex) != len(a):
+        raise ValueError("Ex and a must be of the same size.")
+
+    # Compute the entropy of examples
+    H_Ex = entropy(list(Counter(Ex).values()))
+
+    # Compute the sum of all values v in a
+    sum_v = 0
+    for v in set(a):
+        Ex_a_v = _Ex_a_v_(Ex, a, v, nan)
+        sum_v += (len(Ex_a_v) / len(Ex)) *\
+                 (entropy(list(Counter(Ex_a_v).values())))
+
+    # Return result
+    return H_Ex - sum_v
 
 
-from info_gain import info_gain
+def intrinsic_value(Ex, a, nan=True):
+    """ Compute the intrinsic value of an attribute a for given examples.
 
-summm = 0
-colnames = list(df_raw.columns.values)
-print(colnames)
-for i in colnames:
-	if(i != 'two_year_recid'):
-		ig  = info_gain.info_gain(df_raw['Y'], df_raw[i]) 
-		if(ig <0):
-			print(ig)
-			print(i)
-		else:
-			worksheet.write(row, 0, i) 
-			worksheet.write(row, 1, ig)
-			summm = summm +ig
-			row = row+1
-print(summm)
-      
-workbook.close() 
+        Parameters
+        ----------
+        Ex : list of hashable
+            A list of hashable objects (examples)
+            corresponding to the given attributes a.
+            I.e. a[i] <--> Ex[i].
 
-ig  = info_gain.info_gain(df_raw['Y'], df_raw['capital-gain'])
-print(ig)
+        a : list of hashable
+            A list of hashable objects (attributes)
+            corresponding to the given examples Ex.
+            I.e. a[i] <--> Ex[i].
+            
+        nan : boolean, default=True
+            Boolean indicating how nan==nan should be evaluated.
+            Default == True to avoid division by 0 errors.
+
+        Returns
+        -------
+        result : float
+            Intrinsic value of attribute a for samples Ex.
+
+        """
+    # Check whether examples and attributes have the same lengths.
+    if len(Ex) != len(a):
+        raise ValueError("Ex and a must be of the same size.")
+
+    # Compute the sum of all values v in a
+    sum_v = 0
+    for v in set(a):
+        Ex_a_v = _Ex_a_v_(Ex, a, v, nan)
+        sum_v += (len(Ex_a_v) / len(Ex)) * math.log(len(Ex_a_v) / len(Ex), 2)
+
+    # Return result
+    return -sum_v
+
+
+def info_gain_ratio(Ex, a, nan=True):
+    """ Compute the information gain ratio of an attribute a for given examples.
+
+        Parameters
+        ----------
+        Ex : list of hashable
+            A list of hashable objects (examples)
+            corresponding to the given attributes a.
+            I.e. a[i] <--> Ex[i].
+
+        a : list of hashable
+            A list of hashable objects (attributes)
+            corresponding to the given examples Ex.
+            I.e. a[i] <--> Ex[i].
+            
+        nan : boolean, default=True
+            Boolean indicating how nan==nan should be evaluated.
+            Default == True to avoid division by 0 errors.
+
+        Returns
+        -------
+        result : float
+            Information gain ratio by knowing given attributes.
+            I.e. information gain normalised with intrinsic value calculation.
+
+        """
+    # Check whether examples and attributes have the same lengths.
+    if len(Ex) != len(a):
+        raise ValueError("Ex and a must be of the same size.")
+
+    # Compute information gain ratio as IG/IV
+    return info_gain(Ex, a, nan) / intrinsic_value(Ex, a, nan)
