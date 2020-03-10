@@ -1,2 +1,4 @@
 data
 .idea
+.ipynb_checkpoints
+run*.sh
