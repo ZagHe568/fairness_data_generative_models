@@ -24,62 +24,69 @@ import pandas as pd
 class InOutMapping:
 
   def __init__(self):
-      self.binary_vars = {}
-      self.expand_colnames = []
+    self.binary_vars = {}
+    self.expand_colnames = []
+    self.mean = []
+    self.sd = []
 
+
+  # TODO only scale the numerical features
   def map_input(self, features, dummies):
-      expand_features = pd.get_dummies(features, columns=dummies)
-      for c in dummies:
-          if features[c].nunique() == 2:
-              self.binary_vars[c] = features[c].unique()
-              # deleting one of the binary feature columns
-              new_col = c + '_' + self.binary_vars[c][1]
-              expand_features = expand_features.drop(columns=[new_col])
+    expand_features = pd.get_dummies(features, columns=dummies)
+    for c in dummies:
+        if features[c].nunique() == 2:
+            self.binary_vars[c] = features[c].unique()
+            # deleting one of the binary feature columns
+            new_col = c + '_' + self.binary_vars[c][1]
+            expand_features = expand_features.drop(columns=[new_col])
+            # features = features.drop(columns=['sex_Male', 'Y_<=50K'])
 
-      # features = features.drop(columns=['sex_Male', 'Y_<=50K'])
-      print(expand_features.shape)
-      self.expand_colnames = expand_features.columns
-      scaler = sklearn.preprocessing.StandardScaler()
-      X_scaled = scaler.fit_transform(expand_features)
-      X = X_scaled.astype(np.float32)
-      print(X.shape)
-      return X
+    self.expand_colnames = expand_features.columns
+    scaler = sklearn.preprocessing.StandardScaler()
+    X_scaled = scaler.fit_transform(expand_features)
+    self.mean = scaler.mean_
+    self.sd = np.sqrt(scaler.var_)
+    X = X_scaled.astype(np.float32)
+    #print(X.shape)
+    return X
 
+
+  # TODO revert the scaling for numerical and convert fload to int
+  # TODO rescale everything for now
   def map_output(self, X, dummies, threshold=1):
-      # TODO have the threshold
-      onehot_cols = []
-      noncat_cols_idx = []
-      noncat_cols = []
-      for idx, c in enumerate(self.expand_colnames):
-          if any(map(c.startswith, dummies)):
-              onehot_cols.append(c) #TODO maybe I don't need this
-          else:
-              noncat_cols_idx.append(idx)
-              noncat_cols.append(c)
+    # TODO have the threshold
+    onehot_cols = []
+    noncat_cols_idx = []
+    noncat_cols = []
+    for idx, c in enumerate(self.expand_colnames):
+        if any(map(c.startswith, dummies)):
+            onehot_cols.append(c) #TODO maybe I don't need this
+        else:
+            noncat_cols_idx.append(idx)
+            noncat_cols.append(c)
 
-      revert_df = pd.DataFrame(columns=dummies)
-      for c in dummies:
-          dummy_idx = [idx for idx, val in enumerate(self.expand_colnames) if val.startswith(c)]
-          print("**************************************")
-          print(X.shape)
-          corresponding = X[:, dummy_idx]
-          print(dummy_idx)
-          print(corresponding)
-          if c in self.binary_vars.keys():
-              b0 = self.binary_vars[c][0]
-              b1 = self.binary_vars[c][1]
-              values = [b1 if val < 0.5 else b0 for val in corresponding]  # TODO we don't have 0 and 1
-          else:
-              m = np.zeros_like(corresponding)
-              m[np.arange(len(corresponding)), corresponding.argmax(1)] = 1
-              max_col = np.argmax(m, axis=1)
-              values = [self.expand_colnames[i].replace(c + '_', '') for i in max_col]
-          revert_df[c] = values
+    revert_df = pd.DataFrame(columns=dummies)
+    for c in dummies:
+        dummy_idx = [idx for idx, val in enumerate(self.expand_colnames) if val.startswith(c)]
+        corresponding = X[:, dummy_idx]
+        if c in self.binary_vars.keys():
+            b0 = self.binary_vars[c][0]
+            b1 = self.binary_vars[c][1]
+            values = [b1 if val < 0.5 else b0 for val in corresponding]  # TODO we don't have 0 and 1
+        else:
+            m = np.zeros_like(corresponding)
+            m[np.arange(len(corresponding)), corresponding.argmax(1)] = 1
+            max_col = np.argmax(m, axis=1)
+            values = [self.expand_colnames[i].replace(c + '_', '') for i in max_col]
+        revert_df[c] = values
 
-      res = pd.DataFrame(X[:, noncat_cols_idx], columns=noncat_cols)
-      for c in dummies:
-          res[c] = revert_df[c]
-      return res
+    res = pd.DataFrame(X[:, noncat_cols_idx], columns=noncat_cols)
+    for c in dummies:
+        res[c] = revert_df[c]
+    for i in noncat_cols_idx:
+        c = self.expand_colnames[i]
+        res[c] = int(res[c] * self.sd[i] + self.mean[i])
+    return res
 
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 torch.manual_seed(2019)
@@ -163,36 +170,61 @@ class VAEdSprite(nn.Module):
     #print(train_images)
     loaded_model = torch.load("model_dirgama10/best_modelgama10.pt", map_location=torch.device('cpu'))
     self.load_state_dict(loaded_model)
-    for i in range(5):
-      female_test_data = torch.from_numpy(female_train_images[i]).unsqueeze(0).float()
-      male_test_data = torch.from_numpy(male_train_images[i]).unsqueeze(0).float()
-      print(female_test_data.shape)
-      female_enc = self.encoder(female_test_data)
-      female_mean= female_enc[:,:4]
-      female_covar = female_enc[:,4:]
-      female_standard_div =(female_covar/2).exp()
-      female_epsilon = Variable(female_standard_div.data.new(female_standard_div.size()).normal_())
-      female_z = female_mean+female_epsilon*female_standard_div
+    # for i in range(1000):
+    #   female_test_data = torch.from_numpy(female_train_images[i]).unsqueeze(0).float()
+    #   male_test_data = torch.from_numpy(male_train_images[i]).unsqueeze(0).float()
+    #   #print(female_test_data.shape)
+    #   female_enc = self.encoder(female_test_data)
+    #   female_mean= female_enc[:,:4]
+    #   female_covar = female_enc[:,4:]
+    #   female_standard_div =(female_covar/2).exp()
+    #   female_epsilon = Variable(female_standard_div.data.new(female_standard_div.size()).normal_())
+    #   female_z = female_mean+female_epsilon*female_standard_div
 
 
-      male_enc = self.encoder(male_test_data)
-      male_mean= male_enc[:,:4]
-      male_covar = male_enc[:,4:]
-      male_standard_div =(male_covar/2).exp()
-      male_epsilon = Variable(male_standard_div.data.new(male_standard_div.size()).normal_())
-      male_z = male_mean+male_epsilon*male_standard_div
+    #   male_enc = self.encoder(male_test_data)
+    #   male_mean= male_enc[:,:4]
+    #   male_covar = male_enc[:,4:]
+    #   male_standard_div =(male_covar/2).exp()
+    #   male_epsilon = Variable(male_standard_div.data.new(male_standard_div.size()).normal_())
+    #   male_z = male_mean+male_epsilon*male_standard_div
 
 
 
            
-      inter = 0.4* female_z[0]+ (0.6)* male_z[0]
-      print(inter.shape)
-      recon_x = self.decoder(inter)
-      recon_x = torch.nn.functional.sigmoid(recon_x)
-      io_map = InOutMapping()
-      io_map.map_input(df,dummies)
-      res = io_map.map_output(recon_x.unsqueeze(0).detach().numpy(), dummies,1)
-      print(res)
+    #   inter = 0.4* female_z[0]+ (0.6)* male_z[0]
+    #   #print(inter.shape)
+    #   recon_x = self.decoder(inter)
+    #   recon_x = torch.nn.functional.sigmoid(recon_x)
+    #   io_map = InOutMapping()
+    #   io_map.map_input(df,dummies)
+    #   res = io_map.map_output(recon_x.unsqueeze(0).detach().numpy(), dummies,1)
+    #   print(res)
+    female_test_data = torch.from_numpy(female_train_images[0]).unsqueeze(0).float()
+    male_test_data = torch.from_numpy(male_train_images[0]).unsqueeze(0).float()
+    #print(female_test_data.shape)
+    female_enc = self.encoder(female_test_data)
+    female_mean= female_enc[:,:4]
+    female_covar = female_enc[:,4:]
+    female_standard_div =(female_covar/2).exp()
+    female_epsilon = Variable(female_standard_div.data.new(female_standard_div.size()).normal_())
+    female_z = female_mean+female_epsilon*female_standard_div
+
+
+    male_enc = self.encoder(male_test_data)
+    male_mean= male_enc[:,:4]
+    male_covar = male_enc[:,4:]
+    male_standard_div =(male_covar/2).exp()
+    male_epsilon = Variable(male_standard_div.data.new(male_standard_div.size()).normal_())
+    male_z = male_mean+male_epsilon*male_standard_div
+
+
+
+         
+    inter = 0.4* female_z[0]+ (0.6)* male_z[0]
+    recon_x = self.decoder(inter)
+    recon_x = torch.nn.functional.sigmoid(recon_x)
+    return recon_x
 
 
 
@@ -264,13 +296,19 @@ if __name__ == '__main__':
   scaler = sklearn.preprocessing.StandardScaler()
   X_scaled = scaler.fit_transform(df)
   X = X_scaled.astype(np.float32)
+  #print(X_scaled)
   #print(df.shape)
   #print(X_scaled.shape)
   vae = VAEdSprite()
   #vae.cuda()
   p  = df.values.astype(np.float32)
   #print(X)
-  #vae.fit(X[1000:X.shape[0]-1000])
-  print(X[0:1000].shape)
-  vae.pred2(X[0:1000],X[-1000:],['workclass', 'education', 'marital-status', 'occupation', 'relationship', 'race', 'sex', 'native-country', 'Y'],df)
- 
+  io_map = InOutMapping()
+  X_Negar = io_map.map_input(df_raw,['workclass', 'education', 'marital-status', 'occupation', 'relationship', 'race', 'sex', 'native-country', 'Y'])
+  #vae.fit(X_Negar[1000:X_Negar.shape[0]-1000])
+  print(X_Negar)
+  vae.fit(X_Negar)
+  res = vae.pred2(X_Negar[0:1000],X_Negar[-1000:],['workclass', 'education', 'marital-status', 'occupation', 'relationship', 'race', 'sex', 'native-country', 'Y'],df_raw)
+  dec_res = io_map.map_output(res.unsqueeze(0).detach().numpy(), ['workclass', 'education', 'marital-status', 'occupation', 'relationship', 'race', 'sex', 'native-country', 'Y'],1)
+  print(list(dec_res.columns))
+  print(list(dec_res.values))
