@@ -8,7 +8,11 @@ class InOutMapping:
     def __init__(self):
         self.binary_vars = {}
         self.expand_colnames = []
+        self.mean = []
+        self.sd = []
 
+
+    # TODO only scale the numerical features
     def map_input(self, features, dummies):
         expand_features = pd.get_dummies(features, columns=dummies)
         for c in dummies:
@@ -17,16 +21,20 @@ class InOutMapping:
                 # deleting one of the binary feature columns
                 new_col = c + '_' + self.binary_vars[c][1]
                 expand_features = expand_features.drop(columns=[new_col])
+                # features = features.drop(columns=['sex_Male', 'Y_<=50K'])
 
-        # features = features.drop(columns=['sex_Male', 'Y_<=50K'])
-        print(expand_features.shape)
         self.expand_colnames = expand_features.columns
         scaler = sklearn.preprocessing.StandardScaler()
         X_scaled = scaler.fit_transform(expand_features)
+        self.mean = scaler.mean_
+        self.sd = np.sqrt(scaler.var_)
         X = X_scaled.astype(np.float32)
         print(X.shape)
         return X
 
+
+    # TODO revert the scaling for numerical and convert fload to int
+    # TODO rescale everything for now
     def map_output(self, X, dummies, threshold=1):
         # TODO have the threshold
         onehot_cols = []
@@ -57,6 +65,9 @@ class InOutMapping:
         res = pd.DataFrame(X[:, noncat_cols_idx], columns=noncat_cols)
         for c in dummies:
             res[c] = revert_df[c]
+        for i in noncat_cols_idx:
+            c = self.expand_colnames[i]
+            res[c] = res[c] * self.sd[i] + self.mean[i]
         return res
         # TODO assert values are close
         # TODO fix the binary values
