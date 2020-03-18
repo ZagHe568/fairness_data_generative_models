@@ -11,7 +11,6 @@ class InOutMapping:
         self.mean = []
         self.sd = []
 
-
     # TODO only scale the numerical features
     def map_input(self, features, dummies):
         expand_features = pd.get_dummies(features, columns=dummies)
@@ -32,7 +31,6 @@ class InOutMapping:
         print(X.shape)
         return X
 
-
     # TODO revert the scaling for numerical and convert fload to int
     # TODO rescale everything for now
     def map_output(self, X, dummies, threshold=1):
@@ -42,14 +40,14 @@ class InOutMapping:
         noncat_cols = []
         for idx, c in enumerate(self.expand_colnames):
             if any(map(c.startswith, dummies)):
-                onehot_cols.append(c) #TODO maybe I don't need this
+                onehot_cols.append(c)  # TODO maybe I don't need this
             else:
                 noncat_cols_idx.append(idx)
-                noncat_cols.append(c)
+                noncat_cols.append(c)  # TODO reduce the code to a filter
 
         revert_df = pd.DataFrame(columns=dummies)
         for c in dummies:
-            dummy_idx = [idx for idx, val in enumerate(self.expand_colnames) if val.startswith(c)]
+            dummy_idx = [idx for idx, val in enumerate(self.expand_colnames) if val.startswith(c + '_')]
             corresponding = X[:, dummy_idx]
             if c in self.binary_vars.keys():
                 b0 = self.binary_vars[c][0]
@@ -59,8 +57,8 @@ class InOutMapping:
                 m = np.zeros_like(corresponding)
                 m[np.arange(len(corresponding)), corresponding.argmax(1)] = 1
                 max_col = np.argmax(m, axis=1)
-                values = [self.expand_colnames[i].replace(c + '_', '') for i in max_col]
-            revert_df[c] = values
+                values = [self.expand_colnames[dummy_idx[i]].replace(c + '_', '') for i in max_col]
+            revert_df[c] = values # TODO eliminate revert_df use res in
 
         res = pd.DataFrame(X[:, noncat_cols_idx], columns=noncat_cols)
         for c in dummies:
