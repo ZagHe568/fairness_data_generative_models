@@ -20,7 +20,7 @@ class Generater(nn.Module):
                   nn.Linear(16, 32),
                   nn.ReLU(inplace=True),
                   nn.Linear(32, n_features),
-                  nn.Tanh()]
+                  nn.Sigmoid()]
 
         self.model = nn.Sequential(*model)
 

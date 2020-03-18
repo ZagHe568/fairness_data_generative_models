@@ -42,9 +42,9 @@ class Solver:
         optimizer_D_B = torch.optim.Adam(netD_B.parameters(), lr=args.lr, betas=(0.5, 0.999))
 
         # LR schedulers
-        lr_scheduler_G = LambdaLR(optimizer_G, lr_lambda=Lambda_LR(args.n_epochs, args.epoch, args.decay_epoch).step)
-        lr_scheduler_D_A = LambdaLR(optimizer_D_A, lr_lambda=Lambda_LR(args.n_epochs, args.epoch, args.decay_epoch).step)
-        lr_scheduler_D_B = LambdaLR(optimizer_D_B, lr_lambda=Lambda_LR(args.n_epochs, args.epoch, args.decay_epoch).step)
+        lr_scheduler_G = LambdaLR(optimizer_G, lr_lambda=Lambda_LR(args.n_epochs, 0, args.decay_epoch).step)
+        lr_scheduler_D_A = LambdaLR(optimizer_D_A, lr_lambda=Lambda_LR(args.n_epochs, 0, args.decay_epoch).step)
+        lr_scheduler_D_B = LambdaLR(optimizer_D_B, lr_lambda=Lambda_LR(args.n_epochs, 0, args.decay_epoch).step)
 
         # generated image buffer
         fake_A_buffer = ReplayBuffer()
@@ -80,12 +80,10 @@ class Solver:
         os.makedirs('output/B', exist_ok=True)
 
     def train(self):
-        target_real = torch.ones(self.args.batch_size, device=self.device)
-        target_fake = torch.ones(self.args.batch_size, device=self.device)
         for epoch in range(self.args.n_epochs):
             print(f'*********************Epoch:{epoch}/{self.args.n_epochs}**********************')
             epoch_loss_G, epoch_loss_G_identity, epoch_loss_G_GAN, epoch_loss_G_cycle, epoch_loss_D, epoch_loss = \
-                self.train_epoch(target_real, target_fake)
+                self.train_epoch()
             print(
                 f'Epoch: {epoch+1}/{self.args.n_epochs}, '
                 f'train_loss_G: {epoch_loss_G:.3f}, '
@@ -97,7 +95,7 @@ class Solver:
             self.save_ckp()
             self.eval(epoch)
 
-    def train_epoch(self, target_real, target_fake):
+    def train_epoch(self):
         epoch_loss_G = 0
         epoch_loss_G_identity = 0
         epoch_loss_G_GAN = 0
@@ -105,6 +103,8 @@ class Solver:
         epoch_loss_D = 0
         epoch_loss = 0
         for idx, (real_A, real_B) in enumerate(self.dataloader_train):
+            target_real = torch.ones((real_A.shape[0], 1), device=self.device, dtype=torch.float)
+            target_fake = torch.ones((real_A.shape[0], 1), device=self.device, dtype=torch.float)
             real_A = real_A.to(self.device)
             real_B = real_B.to(self.device)
             self.netG_A2B.train()
@@ -214,15 +214,15 @@ class Solver:
             fake_B = self.netG_A2B(real_A).detach().to('cpu').numpy()
             fake_A = self.netG_B2A(real_B).detach().to('cpu').numpy()
 
-            generated_B = decode_output(fake_B)
-            generated_A = decode_output(fake_A)
+            generated_B = fake_B
+            generated_A = fake_A
 
             generated_As.append(generated_A)
             generated_Bs.append(generated_B)
         generated_As = np.concatenate(generated_As, axis=0)
         generated_Bs = np.concatenate(generated_Bs, axis=0)
-        pd.DataFrame(generated_As).to_csv(f'output/A/generated_A_{epoch:0>3d}.csv')
-        pd.DataFrame(generated_Bs).to_csv(f'output/A/generated_B_{epoch:0>3d}.csv')
+        pd.DataFrame(generated_As).to_csv(f'output/A/generated_A_{epoch:0>3d}.csv', index=False)
+        pd.DataFrame(generated_Bs).to_csv(f'output/B/generated_B_{epoch:0>3d}.csv', index=False)
 
     def save_ckp(self):
         torch.save(self.netG_A2B.state_dict(), 'output/netG_A2B.pth')
