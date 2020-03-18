@@ -1,0 +1,1 @@
+python cycgan/train.py --gpu=1
