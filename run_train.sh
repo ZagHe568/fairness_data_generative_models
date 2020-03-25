@@ -1,1 +1,1 @@
-python cycgan/train.py --gpu=1
+python cycgan/train.py

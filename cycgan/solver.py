@@ -37,9 +37,9 @@ class Solver:
 
         # optimizers
         optimizer_G = torch.optim.Adam(itertools.chain(netG_A2B.parameters(), netG_B2A.parameters()), lr=args.lr,
-                                       betas=(0.5, 0.999))
-        optimizer_D_A = torch.optim.Adam(netD_A.parameters(), lr=args.lr, betas=(0.5, 0.999))
-        optimizer_D_B = torch.optim.Adam(netD_B.parameters(), lr=args.lr, betas=(0.5, 0.999))
+                                       betas=(0.5, 0.999), weight_decay=5e-4)
+        optimizer_D_A = torch.optim.Adam(netD_A.parameters(), lr=args.lr, betas=(0.5, 0.999), weight_decay=5e-4)
+        optimizer_D_B = torch.optim.Adam(netD_B.parameters(), lr=args.lr, betas=(0.5, 0.999), weight_decay=5e-4)
 
         # LR schedulers
         lr_scheduler_G = LambdaLR(optimizer_G, lr_lambda=Lambda_LR(args.n_epochs, 0, args.decay_epoch).step)
@@ -84,13 +84,12 @@ class Solver:
             print(f'*********************Epoch:{epoch}/{self.args.n_epochs}**********************')
             epoch_loss_G, epoch_loss_G_identity, epoch_loss_G_GAN, epoch_loss_G_cycle, epoch_loss_D, epoch_loss = \
                 self.train_epoch()
-            print(
-                f'Epoch: {epoch+1}/{self.args.n_epochs}, '
-                f'train_loss_G: {epoch_loss_G:.3f}, '
-                f'train_loss_G_identity: {epoch_loss_G_identity:.3f}, '
-                f'train_loss_G_GAN: {epoch_loss_G_GAN:.3f}, '
-                f'train_loss_G_cycle: {epoch_loss_G_cycle:.3f}, '
-                f'train_loss_D: {epoch_loss_D:.3f}')
+            print(f'Epoch: {epoch+1}/{self.args.n_epochs}, '
+                  f'train_loss_G: {epoch_loss_G:.2f}, '
+                  f'train_loss_G_identity: {epoch_loss_G_identity:.2f}, '
+                  f'train_loss_G_GAN: {epoch_loss_G_GAN:.2f}, '
+                  f'train_loss_G_cycle: {epoch_loss_G_cycle:.2f}, '
+                  f'train_loss_D: {epoch_loss_D:.2f}\n')
             self.lr_scheduler_G.step(epoch)
             self.save_ckp()
             self.eval(epoch)
@@ -104,7 +103,7 @@ class Solver:
         epoch_loss = 0
         for idx, (real_A, real_B) in enumerate(self.dataloader_train):
             target_real = torch.ones((real_A.shape[0], 1), device=self.device, dtype=torch.float)
-            target_fake = torch.ones((real_A.shape[0], 1), device=self.device, dtype=torch.float)
+            target_fake = torch.zeros((real_A.shape[0], 1), device=self.device, dtype=torch.float)
             real_A = real_A.to(self.device)
             real_B = real_B.to(self.device)
             self.netG_A2B.train()
@@ -181,13 +180,12 @@ class Solver:
             self.optimizer_D_B.step()
 
             if idx % (len(self.dataloader_train) // 20) == 0 or idx == len(self.dataloader_train) - 1:
-                print(
-                    f'Batch: {idx}/{len(self.dataloader_train)}, '
-                    f'loss_G: {loss_G:.3f}, '
-                    f'loss_G_identity: {(loss_identity_A + loss_identity_B):.3f}, '
-                    f'loss_G_GAN: {(loss_GAN_A2B + loss_GAN_B2A):.3f}, '
-                    f'loss_G_cycle: {(loss_cycle_ABA + loss_cycle_BAB):.3f}, '
-                    f'loss_D: {(loss_D_A + loss_D_B):.3f}')
+                print(f'Batch: {idx}/{len(self.dataloader_train)}, '
+                      f'loss_G: {loss_G:.3f}, '
+                      f'loss_G_identity: {(loss_identity_A + loss_identity_B):.3f}, '
+                      f'loss_G_GAN: {(loss_GAN_A2B + loss_GAN_B2A):.3f}, '
+                      f'loss_G_cycle: {(loss_cycle_ABA + loss_cycle_BAB):.3f}, '
+                      f'loss_D: {(loss_D_A + loss_D_B):.3f}')
 
             epoch_loss_G += loss_G.item()
             epoch_loss_G_identity += (loss_identity_A + loss_identity_B).item()

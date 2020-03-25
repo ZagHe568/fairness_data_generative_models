@@ -3,7 +3,7 @@ import random
 
 
 class ReplayBuffer():
-    def __init__(self, max_size=50):
+    def __init__(self, max_size=5):
         assert max_size > 0, 'Empty buffer or trying to create a black hole. Be careful.'
         self.max_size = max_size
         self.data = []

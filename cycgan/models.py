@@ -12,7 +12,8 @@ class Generater(nn.Module):
                   nn.Linear(32, 16),
                   nn.ReLU(inplace=True),
                   nn.Linear(16, 4),
-                  nn.ReLU(inplace=True)]
+                  # nn.ReLU(inplace=True)
+                  ]
 
         # upsampling layers
         model += [nn.Linear(4, 16),
@@ -20,7 +21,8 @@ class Generater(nn.Module):
                   nn.Linear(16, 32),
                   nn.ReLU(inplace=True),
                   nn.Linear(32, n_features),
-                  nn.Sigmoid()]
+                  # nn.Sigmoid()
+                  ]
 
         self.model = nn.Sequential(*model)
 
