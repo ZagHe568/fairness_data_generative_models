@@ -71,8 +71,10 @@ class InOutMapping2:
         self.sd = []
         self.num_cols_idx = []
         self.num_cols = []
+        self.ordered_columns = []
 
     def map_input(self, features, dummies):
+        self.ordered_columns = features.columns
         for idx, c in enumerate(features.columns):
             if c not in dummies:
                 #self.num_cols_idx.append(idx)
@@ -126,5 +128,10 @@ class InOutMapping2:
         for i in range(len(self.num_cols)):
             c = self.num_cols[i]
             res[c] = int(res[c] * self.sd[i] + self.mean[i])
-        print(res.shape)
-        return res
+        # print(res.shape)
+        # print(res.columns)
+        reorder_res = pd.DataFrame()
+        for c in self.ordered_columns:
+            reorder_res[c] = res[c]
+        print(reorder_res.shape)
+        return reorder_res
