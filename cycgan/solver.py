@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from models import Generater, Discriminator
 from utils import ReplayBuffer, Lambda_LR, decode_output
-from datasets import train_loder, val_loader
+from datasets import train_loder
 
 
 class Solver:
@@ -53,8 +53,6 @@ class Solver:
         # dataloader
         dataloader_train = train_loder(data_A_path=args.data_A_path, data_B_path=args.data_B_path,
                                        batch_size=args.batch_size, num_workers=num_workers)
-        dataloader_val = val_loader(data_A_path=args.data_A_path, data_B_path=args.data_B_path,
-                                    batch_size=args.batch_size, num_workers=num_workers)
 
         self.args = args
         self.device = device
@@ -74,7 +72,6 @@ class Solver:
         self.fake_A_buffer = fake_A_buffer
         self.fake_B_buffer = fake_B_buffer
         self.dataloader_train = dataloader_train
-        self.dataloader_val = dataloader_val
 
         os.makedirs('output/A', exist_ok=True)
         os.makedirs('output/B', exist_ok=True)
@@ -92,7 +89,7 @@ class Solver:
                   f'train_loss_D: {epoch_loss_D:.2f}\n')
             self.lr_scheduler_G.step(epoch)
             self.save_ckp()
-            self.eval(epoch)
+        self.eval()
 
     def train_epoch(self):
         epoch_loss_G = 0
@@ -201,14 +198,14 @@ class Solver:
         epoch_loss_D /= len(self.dataloader_train)
         return epoch_loss_G, epoch_loss_G_identity, epoch_loss_G_GAN, epoch_loss_G_cycle, epoch_loss_D, epoch_loss
 
-    def eval(self, epoch):
+    def eval(self):
         self.load_ckp()
         self.netG_A2B.eval()
         self.netG_B2A.eval()
 
         generated_As = []
         generated_Bs = []
-        for i, (real_A, real_B) in enumerate(self.dataloader_val):
+        for i, (real_A, real_B) in enumerate(self.dataloader_train):
             fake_B = self.netG_A2B(real_A).detach().to('cpu').numpy()
             fake_A = self.netG_B2A(real_B).detach().to('cpu').numpy()
 
@@ -219,8 +216,8 @@ class Solver:
             generated_Bs.append(generated_B)
         generated_As = np.concatenate(generated_As, axis=0)
         generated_Bs = np.concatenate(generated_Bs, axis=0)
-        pd.DataFrame(generated_As).to_csv(f'output/A/generated_A_{epoch:0>3d}.csv', index=False)
-        pd.DataFrame(generated_Bs).to_csv(f'output/B/generated_B_{epoch:0>3d}.csv', index=False)
+        pd.DataFrame(generated_As).to_csv(f'output/generated_A.csv', index=False)
+        pd.DataFrame(generated_Bs).to_csv(f'output/generated_B.csv', index=False)
 
     def save_ckp(self):
         torch.save(self.netG_A2B.state_dict(), 'output/netG_A2B.pth')

@@ -5,12 +5,11 @@ import random
 
 
 class DemographicDataset(data.Dataset):
-    def __init__(self, data_A_path, data_B_path, mode='train'):
-        data_A = pd.read_csv(f'{data_A_path}_{mode}', index_col=None).values
-        data_B = pd.read_csv(f'{data_B_path}_{mode}', index_col=None).values
+    def __init__(self, data_A_path, data_B_path):
+        data_A = pd.read_csv(f'{data_A_path}', index_col=None).values
+        data_B = pd.read_csv(f'{data_B_path}', index_col=None).values
         self.data_A = torch.from_numpy(data_A).to(torch.float)
         self.data_B = torch.from_numpy(data_B).to(torch.float)
-        self.mode = mode
 
     def __getitem__(self, index):
         item_A = self.data_A[index % self.data_A.shape[0]]
@@ -22,11 +21,6 @@ class DemographicDataset(data.Dataset):
 
 
 def train_loder(data_A_path, data_B_path, batch_size, num_workers):
-    dataset = DemographicDataset(data_A_path, data_B_path, 'train')
+    dataset = DemographicDataset(data_A_path, data_B_path)
     return data.DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
-
-
-def val_loader(data_A_path, data_B_path, batch_size, num_workers):
-    dataset = DemographicDataset(data_A_path, data_B_path, 'val')
-    return data.DataLoader(dataset, batch_size=batch_size, num_workers=num_workers)
 
