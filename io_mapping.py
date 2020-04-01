@@ -10,16 +10,20 @@ class InOutMapping:
         self.onehot_colnames = []
         self.mean = []
         self.sd = []
-        self.num_cols_idx = []
+        # self.num_cols_idx = []
         self.num_cols = []
         self.ordered_columns = []
+        self.is_categorical = []
 
     def map_input(self, features, dummies):
         self.ordered_columns = features.columns
         for idx, c in enumerate(features.columns):
             if c not in dummies:
-                #self.num_cols_idx.append(idx)
+                # self.num_cols_idx.append(idx)
                 self.num_cols.append(c)
+                self.is_categorical.append(0)
+            else:
+                self.is_categorical.append(1)
 
         expand_features = pd.get_dummies(features[dummies], columns=dummies)
         # reduce the binary variables to only one column
@@ -31,9 +35,7 @@ class InOutMapping:
                 expand_features = expand_features.drop(columns=[new_col])
                 # features = features.drop(columns=['sex_Male', 'Y_<=50K'])
 
-
         self.onehot_colnames = expand_features.columns
-
 
         scaler = sklearn.preprocessing.StandardScaler()
         print(expand_features.shape)
@@ -47,10 +49,11 @@ class InOutMapping:
         X_scaled = X_scaled.astype(np.float32)
         return X_scaled
 
-    def map_output(self, X, dummies, threshold=1): # TODO have the threshold
+    def map_output(self, X, dummies, threshold=1):  # TODO have the threshold
         dummies_df = pd.DataFrame(columns=dummies)
         for c in dummies:
-            dummy_idx = [len(self.num_cols)+idx for idx, val in enumerate(self.onehot_colnames) if val.startswith(c + '_')]
+            dummy_idx = [len(self.num_cols) + idx for idx, val in enumerate(self.onehot_colnames) if
+                         val.startswith(c + '_')]
             corresponding = X[:, dummy_idx]
             if c in self.binary_vars.keys():
                 b0 = self.binary_vars[c][0]
@@ -60,7 +63,7 @@ class InOutMapping:
                 m = np.zeros_like(corresponding)
                 m[np.arange(len(corresponding)), corresponding.argmax(1)] = 1
                 max_col = np.argmax(m, axis=1)
-                values = [self.onehot_colnames[dummy_idx[i]-len(self.num_cols)].replace(c + '_', '') for i in max_col]
+                values = [self.onehot_colnames[dummy_idx[i] - len(self.num_cols)].replace(c + '_', '') for i in max_col]
             dummies_df[c] = values  # TODO eliminate dummies_df use res in
 
         res = pd.DataFrame(X[:, 0:len(self.num_cols)], columns=self.num_cols)
@@ -69,7 +72,7 @@ class InOutMapping:
         # scale back
         for i in range(len(self.num_cols)):
             c = self.num_cols[i]
-            res[c] = (res[c] * self.sd[i] + self.mean[i]).astype(int)
+            res[c] = int(res[c] * self.sd[i] + self.mean[i])
         # print(res.shape)
         # print(res.columns)
         reorder_res = pd.DataFrame()
@@ -86,16 +89,20 @@ class InOutMapping2:
         self.onehot_colnames = []
         self.mean = []
         self.sd = []
-        self.num_cols_idx = []
+        # self.num_cols_idx = []
         self.num_cols = []
         self.ordered_columns = []
+        self.is_categorical = []
 
     def map_input(self, features, dummies):
         self.ordered_columns = features.columns
         for idx, c in enumerate(features.columns):
             if c not in dummies:
-                #self.num_cols_idx.append(idx)
+                # self.num_cols_idx.append(idx)
                 self.num_cols.append(c)
+                self.is_categorical.append(0)
+            else:
+                self.is_categorical.append(1)
 
         expand_features = pd.get_dummies(features[dummies], columns=dummies)
         print(expand_features.shape)
@@ -111,7 +118,6 @@ class InOutMapping2:
         print(expand_features.shape)
         self.onehot_colnames = expand_features.columns
 
-
         scaler = sklearn.preprocessing.StandardScaler()
         X_num_scaled = scaler.fit_transform(features[self.num_cols])
         self.mean = scaler.mean_
@@ -122,10 +128,11 @@ class InOutMapping2:
         print(X.shape)
         return X
 
-    def map_output(self, X, dummies, threshold=1): # TODO have the threshold
+    def map_output(self, X, dummies, threshold=1):  # TODO have the threshold
         dummies_df = pd.DataFrame(columns=dummies)
         for c in dummies:
-            dummy_idx = [len(self.num_cols)+idx for idx, val in enumerate(self.onehot_colnames) if val.startswith(c + '_')]
+            dummy_idx = [len(self.num_cols) + idx for idx, val in enumerate(self.onehot_colnames) if
+                         val.startswith(c + '_')]
             corresponding = X[:, dummy_idx]
             if c in self.binary_vars.keys():
                 b0 = self.binary_vars[c][0]
@@ -135,7 +142,7 @@ class InOutMapping2:
                 m = np.zeros_like(corresponding)
                 m[np.arange(len(corresponding)), corresponding.argmax(1)] = 1
                 max_col = np.argmax(m, axis=1)
-                values = [self.onehot_colnames[dummy_idx[i]-len(self.num_cols)].replace(c + '_', '') for i in max_col]
+                values = [self.onehot_colnames[dummy_idx[i] - len(self.num_cols)].replace(c + '_', '') for i in max_col]
             dummies_df[c] = values  # TODO eliminate dummies_df use res in
 
         res = pd.DataFrame(X[:, 0:len(self.num_cols)], columns=self.num_cols)
@@ -144,7 +151,7 @@ class InOutMapping2:
         # scale back
         for i in range(len(self.num_cols)):
             c = self.num_cols[i]
-            res[c] = (res[c] * self.sd[i] + self.mean[i]).astype(int)
+            res[c] = int(res[c] * self.sd[i] + self.mean[i])
         # print(res.shape)
         # print(res.columns)
         reorder_res = pd.DataFrame()
