@@ -216,6 +216,9 @@ class Solver:
             generated_Bs.append(generated_B)
         generated_As = np.concatenate(generated_As, axis=0)
         generated_Bs = np.concatenate(generated_Bs, axis=0)
+
+        np.random.shuffle(generated_As)
+        np.random.shuffle(generated_Bs)
         pd.DataFrame(generated_As).to_csv(f'output/generated_A.csv', index=False)
         pd.DataFrame(generated_Bs).to_csv(f'output/generated_B.csv', index=False)
 

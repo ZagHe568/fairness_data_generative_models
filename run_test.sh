@@ -1,0 +1,1 @@
+python cycgan/test.py
