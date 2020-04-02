@@ -5,7 +5,7 @@ import os
 import itertools
 import numpy as np
 import pandas as pd
-from models import Generater, Discriminator
+from models import Generator, Discriminator, GeneratorLSTM, DiscriminatorLSTM
 from utils import ReplayBuffer, Lambda_LR, decode_output
 from datasets import train_loder
 
@@ -21,10 +21,16 @@ class Solver:
             print("Let's use {} GPUs!".format(torch.cuda.device_count()))
 
         # models
-        netG_A2B = Generater(args.n_features)
-        netG_B2A = Generater(args.n_features)
-        netD_A = Discriminator(args.n_features)
-        netD_B = Discriminator(args.n_features)
+        if not args.lstm:
+            netG_A2B = Generator(args.n_features)
+            netG_B2A = Generator(args.n_features)
+            netD_A = Discriminator(args.n_features)
+            netD_B = Discriminator(args.n_features)
+        else:
+            netG_A2B = GeneratorLSTM(args.n_features)
+            netG_B2A = GeneratorLSTM(args.n_features)
+            netD_A = DiscriminatorLSTM(args.n_features)
+            netD_B = DiscriminatorLSTM(args.n_features)
         netG_A2B.to(device)
         netG_B2A.to(device)
         netD_A.to(device)
@@ -73,14 +79,22 @@ class Solver:
         self.fake_B_buffer = fake_B_buffer
         self.dataloader_train = dataloader_train
 
-        os.makedirs('output/A', exist_ok=True)
-        os.makedirs('output/B', exist_ok=True)
+        os.makedirs('output_{}/A'.format('lstm' if self.args.lstm else 'fc'), exist_ok=True)
+        os.makedirs('output_{}/B'.format('lstm' if self.args.lstm else 'fc'), exist_ok=True)
 
     def train(self):
+        best_loss_G = 9e9
+        best_loss_G_epoch = 0
+        patience = 10
         for epoch in range(self.args.n_epochs):
             print(f'*********************Epoch:{epoch}/{self.args.n_epochs}**********************')
             epoch_loss_G, epoch_loss_G_identity, epoch_loss_G_GAN, epoch_loss_G_cycle, epoch_loss_D, epoch_loss = \
                 self.train_epoch()
+            if epoch_loss_G < best_loss_G:
+                best_loss_G = epoch_loss_G
+                best_loss_G_epoch = epoch
+            if epoch - best_loss_G_epoch > patience:
+                break
             print(f'Epoch: {epoch+1}/{self.args.n_epochs}, '
                   f'train_loss_G: {epoch_loss_G:.2f}, '
                   f'train_loss_G_identity: {epoch_loss_G_identity:.2f}, '
@@ -113,14 +127,14 @@ class Solver:
 
             # Identity loss
             # G_A2B(B) should be equal B if real B is fed
-            same_B = self.netG_A2B(real_B)
+            same_B = self.netG_A2B(real_B) if not self.args.lstm else self.netG_A2B(real_B, real_B)
             loss_identity_B = self.criterion_identity(same_B, real_B)*5
             # G_B2A(A) should be equal A if real A is fed
-            same_A = self.netG_B2A(real_A)
+            same_A = self.netG_B2A(real_A) if not self.args.lstm else self.netG_A2B(real_A, real_A)
             loss_identity_A = self.criterion_identity(same_A, real_A)*5
 
             # GAN loss
-            fake_B= self.netG_A2B(real_A)
+            fake_B = self.netG_A2B(real_A)
             pred_fake = self.netD_B(fake_B)
             loss_GAN_A2B = self.criterion_GAN(pred_fake, target_real)
 
@@ -129,10 +143,10 @@ class Solver:
             loss_GAN_B2A= self.criterion_GAN(pred_fake, target_real)
 
             # Cycle loss
-            recovered_A = self.netG_B2A(fake_B)
+            recovered_A = self.netG_B2A(fake_B) if not self.args.lstm else self.netG_B2A(fake_B, real_A)
             loss_cycle_ABA = self.criterion_cycle(recovered_A, real_A)*10
 
-            recovered_B = self.netG_A2B(fake_A)
+            recovered_B = self.netG_A2B(fake_A) if not self.args.lstm else self.netG_A2B(fake_A, real_B)
             loss_cycle_BAB = self.criterion_cycle(recovered_B, real_B)*10
 
             # Total loss
@@ -206,6 +220,8 @@ class Solver:
         generated_As = []
         generated_Bs = []
         for i, (real_A, real_B) in enumerate(self.dataloader_train):
+            real_A = real_A.to(self.device)
+            real_B = real_B.to(self.device)
             fake_B = self.netG_A2B(real_A).detach().to('cpu').numpy()
             fake_A = self.netG_B2A(real_B).detach().to('cpu').numpy()
 
@@ -219,17 +235,21 @@ class Solver:
 
         np.random.shuffle(generated_As)
         np.random.shuffle(generated_Bs)
-        pd.DataFrame(generated_As).to_csv(f'output/generated_A.csv', index=False)
-        pd.DataFrame(generated_Bs).to_csv(f'output/generated_B.csv', index=False)
+        pd.DataFrame(generated_As).to_csv('output_{}/generated_A.csv'.format('lstm' if self.args.lstm else 'fc'), index=False)
+        pd.DataFrame(generated_Bs).to_csv('output_{}/generated_B.csv'.format('lstm' if self.args.lstm else 'fc'), index=False)
 
     def save_ckp(self):
-        torch.save(self.netG_A2B.state_dict(), 'output/netG_A2B.pth')
-        torch.save(self.netG_B2A.state_dict(), 'output/netG_B2A.pth')
-        torch.save(self.netD_A.state_dict(), 'output/netD_A.pth')
-        torch.save(self.netD_B.state_dict(), 'output/netD_B.pth')
+        torch.save(self.netG_A2B.state_dict(), 'output_{}/netG_A2B.pth'.format('lstm' if self.args.lstm else 'fc'))
+        torch.save(self.netG_B2A.state_dict(), 'output_{}/netG_B2A.pth'.format('lstm' if self.args.lstm else 'fc'))
+        torch.save(self.netD_A.state_dict(), 'output_{}/netD_A.pth'.format('lstm' if self.args.lstm else 'fc'))
+        torch.save(self.netD_B.state_dict(), 'output_{}/netD_B.pth'.format('lstm' if self.args.lstm else 'fc'))
 
     def load_ckp(self):
-        self.netG_A2B.load_state_dict(torch.load('output/netG_A2B.pth', map_location=self.device))
-        self.netG_B2A.load_state_dict(torch.load('output/netG_B2A.pth', map_location=self.device))
-        self.netD_A.load_state_dict(torch.load('output/netD_A.pth', map_location=self.device))
-        self.netD_B.load_state_dict(torch.load('output/netD_B.pth', map_location=self.device))
+        self.netG_A2B.load_state_dict(torch.load('output_{}/netG_A2B.pth'.format('lstm' if self.args.lstm else 'fc'),
+                                                 map_location=self.device))
+        self.netG_B2A.load_state_dict(torch.load('output_{}/netG_B2A.pth'.format('lstm' if self.args.lstm else 'fc'),
+                                                 map_location=self.device))
+        self.netD_A.load_state_dict(torch.load('output_{}/netD_A.pth'.format('lstm' if self.args.lstm else 'fc'),
+                                               map_location=self.device))
+        self.netD_B.load_state_dict(torch.load('output_{}/netD_B.pth'.format('lstm' if self.args.lstm else 'fc'),
+                                               map_location=self.device))

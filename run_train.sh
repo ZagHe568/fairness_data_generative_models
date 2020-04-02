@@ -1,1 +1,1 @@
-python cycgan/train.py
+python cycgan/train.py --lstm --gpu=0

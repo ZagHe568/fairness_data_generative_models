@@ -6,3 +6,4 @@ venv
 .ipynb_checkpoints
 .model_dirgama10
 output
+run*.sh

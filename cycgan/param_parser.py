@@ -11,5 +11,6 @@ def parameter_parser():
     parser.add_argument('--n_epochs', type=int, default=200)
     parser.add_argument('--decay_epoch', type=int, default=100)
     parser.add_argument('--gpu', type=str, default='')
+    parser.add_argument('--lstm', action='store_true', default=False)
 
     return parser.parse_args()
