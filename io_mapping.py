@@ -72,7 +72,7 @@ class InOutMapping:
         # scale back
         for i in range(len(self.num_cols)):
             c = self.num_cols[i]
-            res[c] = int(res[c] * self.sd[i] + self.mean[i])
+            res[c] = (res[c] * self.sd[i] + self.mean[i]).astype(int)
         # print(res.shape)
         # print(res.columns)
         reorder_res = pd.DataFrame()
@@ -151,7 +151,7 @@ class InOutMapping2:
         # scale back
         for i in range(len(self.num_cols)):
             c = self.num_cols[i]
-            res[c] = int(res[c] * self.sd[i] + self.mean[i])
+            res[c] = res[c] = (res[c] * self.sd[i] + self.mean[i]).astype(int)
         # print(res.shape)
         # print(res.columns)
         reorder_res = pd.DataFrame()

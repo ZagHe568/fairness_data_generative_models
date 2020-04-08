@@ -5,5 +5,7 @@ venv
 .idea
 .ipynb_checkpoints
 .model_dirgama10
-output
+output*/
 run*.sh
+tgan/tgan_example.ipynb
+tgan/tgan_example.py
