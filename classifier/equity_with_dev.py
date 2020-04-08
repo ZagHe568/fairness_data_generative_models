@@ -179,8 +179,8 @@ diff = tf.to_float(pred) - Y_placeholder[:, 1]
 accuracy = 1 - tf.math.reduce_mean(tf.math.abs(diff))
 loss_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(labels=Y_placeholder, logits=output))
 
-loss_total = beta * (fairness_loss) + (1-beta)*loss_entropy
-#loss_total = loss_entropy
+#loss_total = beta * (fairness_loss) + (1-beta)*loss_entropy
+loss_total = loss_entropy
 
 # remove regulization on w
 variables = [v for v in tf.trainable_variables() if v != raw_w]
